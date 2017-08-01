@@ -60,6 +60,11 @@ func Log(lvl Level, message interface{}) error {
 
 	var msgStr string
 
+	// check if message is nil
+	if message == nil {
+		return fmt.Errorf("message was nil")
+	}
+
 	switch lvl {
 	// string messages
 	case LevelStdout, LevelStderr:
