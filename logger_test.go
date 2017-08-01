@@ -3,6 +3,7 @@ package zerolog
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math"
 	"reflect"
 	"testing"
@@ -69,13 +70,18 @@ func TestStringInput(t *testing.T) {
 	ia = 1
 	err = Log(LoglevelStdout, ia)
 	assertError(t, err)
+
+	// TextMarshaler error
+	var tme textMarchalError
+	err = Log(LoglevelStdout, tme)
+	assertError(t, err)
 }
 
 // test types for TestStringInput
 type stringAlias string
 type intAlias int
 
-// test type that implements fmt.Stringger
+// test type that implements fmt.Stringer
 type strigger struct {
 	s string
 }
@@ -93,6 +99,14 @@ func (tm textMarchal) MarshalText() ([]byte, error) {
 	return []byte(tm.s), nil
 }
 
+// test type that implements encoding.TextMarshaler
+// returns an error
+type textMarchalError struct {
+}
+
+func (tm textMarchalError) MarshalText() ([]byte, error) {
+	return nil, fmt.Errorf("An expected error")
+}
 func TestJSONInput(t *testing.T) {
 	// marshal test structure and check output
 	tstruct := testStruct{
@@ -197,13 +211,13 @@ func assertEqual(t *testing.T, expected, actual interface{}) bool {
 	return true
 }
 
-// equal check copied from:
-// github.com/stretchr/testify/assert/assertions.go
+// equal check
+// soure: github.com/stretchr/testify/assert/assertions.go
 func ObjectsAreEqual(expected, actual interface{}) bool {
-
 	if expected == nil || actual == nil {
 		return expected == actual
 	}
+
 	if exp, ok := expected.([]byte); ok {
 		act, ok := actual.([]byte)
 		if !ok {
@@ -213,5 +227,6 @@ func ObjectsAreEqual(expected, actual interface{}) bool {
 		}
 		return bytes.Equal(exp, act)
 	}
+
 	return reflect.DeepEqual(expected, actual)
 }
