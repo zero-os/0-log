@@ -247,6 +247,5 @@ func ObjectsAreEqual(expected, actual interface{}) bool {
 		}
 		return bytes.Equal(exp, act)
 	}
-
 	return reflect.DeepEqual(expected, actual)
 }
