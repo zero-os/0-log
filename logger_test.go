@@ -21,44 +21,77 @@ func TestLogLevelSwitch(t *testing.T) {
 	err = Log(LoglevelJSON, "")
 	assert.NoError(t, err)
 
-	// yaml
-	err = Log(LoglevelYAML, "")
-	assert.NoError(t, err)
-
-	// toml
-	err = Log(LoglevelTOML, "")
-	assert.Error(t, err)
-	assert.Equal(t, ErrLevelNotImplemented.Error(), err.Error())
-
 	// invalid
 	err = Log(255, "")
 	assert.Error(t, err)
 	assert.Equal(t, ErrLevelNotValid.Error(), err.Error())
 
+	// nil message
+	err = Log(1, nil)
+	assert.Error(t, err)
+	assert.Equal(t, "message was nil", err.Error())
+
 }
 
 func TestStringInput(t *testing.T) {
+	// check valid strings
+	//normal string
 	err := Log(LoglevelStdout, "hello\nworld")
 	assert.NoError(t, err)
 
-	err = Log(LoglevelStdout, struct{}{})
-	assert.Error(t, err)
-	assert.Equal(t, "message was not a string", err.Error())
-
-	err = Log(LoglevelStdout, nil)
-	assert.Error(t, err)
-	assert.Equal(t, "message was not a string", err.Error())
-
-	err = Log(LoglevelStderr, "hello\nworld")
+	//string alias
+	var sa stringAlias
+	sa = "hello world"
+	err = Log(LoglevelStdout, sa)
 	assert.NoError(t, err)
 
-	err = Log(LoglevelStderr, struct{}{})
-	assert.Error(t, err)
-	assert.Equal(t, "message was not a string", err.Error())
+	//implements stringer
+	st := strigger{
+		s: "lorem ipsum",
+	}
+	err = Log(LoglevelStdout, st)
+	assert.NoError(t, err)
 
-	err = Log(LoglevelStderr, nil)
+	//implements TextMarshaler
+	tm := textMarchal{
+		"dolor sit amet",
+	}
+	err = Log(LoglevelStdout, tm)
+	assert.NoError(t, err)
+
+	// check invalid strings
+	//empty struct
+	err = Log(LoglevelStdout, struct{}{})
 	assert.Error(t, err)
-	assert.Equal(t, "message was not a string", err.Error())
+	assert.Equal(t, "could not turn message into string", err.Error())
+
+	//alias
+	var ia intAlias
+	ia = 1
+	err = Log(LoglevelStdout, ia)
+	assert.Error(t, err)
+}
+
+// test types for TestStringInput
+type stringAlias string
+type intAlias int
+
+// test type that implements fmt.Stringger
+type strigger struct {
+	s string
+}
+
+func (s strigger) String() string {
+	return s.s
+}
+
+// test type that implements encoding.TextMarshaler
+type textMarchal struct {
+	s string
+}
+
+func (tm textMarchal) MarshalText() ([]byte, error) {
+	return []byte(tm.s), nil
 }
 
 func TestJSONInput(t *testing.T) {
@@ -87,36 +120,6 @@ func TestJSONInput(t *testing.T) {
 	// write a value json can't marshal
 	err = Log(LoglevelJSON, math.Inf(1))
 	assert.Error(t, err)
-}
-
-func TestYAMLInput(t *testing.T) {
-	// marshal test structure and check output
-	tstruct := testStruct{
-		TestField:      "Hello world",
-		OtherTestfield: 1,
-	}
-	tstructExpected := "21:::\ntestfield: Hello world\nothertestfield: 1\n\n:::"
-
-	// check no error if logged
-	err := Log(LoglevelYAML, tstruct)
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	// check output is as expected
-	yamlStr, err := marshalYaml(tstruct)
-	if !assert.NoError(t, err) {
-		return
-	}
-	out := formatLog(LoglevelYAML, yamlStr)
-
-	assert.Equal(t, tstructExpected, out)
-
-	// write a value yaml can't marshal
-	val := make(chan struct{})
-	err = Log(LoglevelYAML, val)
-	assert.Error(t, err)
-	assert.Equal(t, "could not marshal provided message into YAML: cannot marshal type: chan struct {}", err.Error())
 }
 
 func TestFormatLog(t *testing.T) {

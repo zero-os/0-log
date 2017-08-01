@@ -1,67 +1,54 @@
+//package zerolog is a tool that prints messages in a format the 0-Ochestrator can read and use for selfhealing and other features
 package zerolog
 
 import (
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
-
-	"github.com/go-yaml/yaml"
-	"github.com/siddontang/go/log"
-)
-
-var (
-	// ErrLevelNotImplemented defines en error where the logging level is not yet implented
-	ErrLevelNotImplemented = errors.New("logging level not yet implemented")
-	// ErrLevelNotValid defines an error where the loggin level is not supported/valid
-	ErrLevelNotValid = errors.New("logging level not valid")
 )
 
 // Loglevel represents the level that will be logged at
 type Loglevel uint8
 
 const (
-	// LoglevelStdout stdout log level
+	// LoglevelStdout stdout loglevel
 	LoglevelStdout Loglevel = 1
-	// LoglevelStderr stderr log level
+	// LoglevelStderr stderr loglevel
 	LoglevelStderr Loglevel = 2
-	// LoglevelJSON json log level
+	// LoglevelJSON json loglevel
 	LoglevelJSON Loglevel = 20
-	// LoglevelYAML yaml log level
-	LoglevelYAML Loglevel = 21
-	// LoglevelTOML toml log level
-	LoglevelTOML Loglevel = 22
 )
+
+// ErrLevelNotValid defines an error where the loggin level is not supported/valid
+var ErrLevelNotValid = errors.New("logging level not valid")
 
 // Log prints a message in the Orchestrator logging format
 func Log(lvl Loglevel, message interface{}) error {
 	var msgStr string
 
+	// check if message is nil
+	if message == nil {
+		return fmt.Errorf("message was nil")
+	}
+
 	switch lvl {
 	// string messages
 	case LoglevelStdout, LoglevelStderr:
-		var ok bool
-		msgStr, ok = message.(string)
-		if !ok {
-			return errors.New("message was not a string")
+		var err error
+		msgStr, err = msgString(message)
+		if err != nil {
+			return err
 		}
 	// json messages
 	case LoglevelJSON:
-		msgBs, err := json.Marshal(&message)
+		msgBs, err := json.Marshal(message)
 		if err != nil {
 			return fmt.Errorf("could not marshal provided message into JSON: %s", err)
 		}
 		msgStr = string(msgBs)
-	// yaml messages
-	case LoglevelYAML:
-		yamlStr, err := marshalYaml(message)
-		if err != nil {
-			return fmt.Errorf("could not marshal provided message into YAML: %s", err)
-		}
-		msgStr = yamlStr
-	//toml messages
-	case LoglevelTOML:
-		return ErrLevelNotImplemented
 	default:
 		return ErrLevelNotValid
 	}
@@ -70,6 +57,32 @@ func Log(lvl Loglevel, message interface{}) error {
 	fmt.Println(formatLog(lvl, msgStr))
 
 	return nil
+}
+
+// checks if the interface can be turned into a string and returns it as such
+// boolean returned determines if the interface could be turned into a string (ok)
+func msgString(msg interface{}) (string, error) {
+
+	// check if msg reflects string
+	if reflect.TypeOf(msg).Kind() == reflect.String {
+		return reflect.ValueOf(msg).String(), nil
+	}
+
+	// check if implements Stringer
+	if m, ok := msg.(fmt.Stringer); ok {
+		return m.String(), nil
+	}
+
+	// check if implements TextMarshaler
+	if m, ok := msg.(encoding.TextMarshaler); ok {
+		str, err := m.MarshalText()
+		if err != nil {
+			return "", fmt.Errorf("could not TextMarshal provided message: %s", err)
+		}
+		return string(str), nil
+	}
+
+	return "", fmt.Errorf("could not turn message into string")
 }
 
 // formatLog formats the log output
@@ -84,35 +97,5 @@ func formatLog(lvl Loglevel, msg string) string {
 
 // isMultiline return true when a string constains \n
 func isMultiline(str string) bool {
-	buf := strings.Split(str, "\n")
-	if len(buf) > 1 {
-		return true
-	}
-
-	return false
-}
-
-func marshalYaml(msg interface{}) (res string, err error) {
-	// catch yaml panics
-	defer func() {
-		if r := recover(); r != nil {
-
-			log.Errorf("Recovered YAML panic: %s", r)
-			switch x := r.(type) {
-			case string:
-				err = errors.New(x)
-			case error:
-				err = x
-			default:
-				err = errors.New("unknown panic")
-			}
-		}
-	}()
-	msgBs, yerr := yaml.Marshal(&msg)
-	if yerr != nil {
-		err = fmt.Errorf("could not marshal provided message into YAML: %s", yerr)
-		return
-	}
-	res = string(msgBs)
-	return
+	return strings.Contains(str, "\n")
 }
