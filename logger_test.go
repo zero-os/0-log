@@ -81,6 +81,11 @@ func TestStringInput(t *testing.T) {
 	var tme textMarchalError
 	err = Log(LevelStdout, tme)
 	assertError(t, err)
+
+	// TextMarshaler error
+	var tme textMarchalError
+	err = Log(LoglevelStdout, tme)
+	assertError(t, err)
 }
 
 // test types for TestStringInput
@@ -247,5 +252,6 @@ func ObjectsAreEqual(expected, actual interface{}) bool {
 		}
 		return bytes.Equal(exp, act)
 	}
+
 	return reflect.DeepEqual(expected, actual)
 }
