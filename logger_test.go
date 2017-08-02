@@ -11,15 +11,15 @@ import (
 
 func TestLogLevelSwitch(t *testing.T) {
 	// stdout
-	err := Log(LoglevelStdout, "")
+	err := Log(LevelStdout, "")
 	assertNoError(t, err)
 
 	// stderr
-	err = Log(LoglevelStderr, "")
+	err = Log(LevelStderr, "")
 	assertNoError(t, err)
 
 	// json
-	err = Log(LoglevelJSON, "")
+	err = Log(LevelJSON, "")
 	assertNoError(t, err)
 
 	// invalid
@@ -30,50 +30,50 @@ func TestLogLevelSwitch(t *testing.T) {
 	// nil message
 	err = Log(1, nil)
 	assertError(t, err)
-	assertEqual(t, "message was nil", err.Error())
+	assertEqual(t, ErrNilMessage.Error(), err.Error())
 }
 
 func TestStringInput(t *testing.T) {
 	// check valid strings
 	//normal string
-	err := Log(LoglevelStdout, "hello\nworld")
+	err := Log(LevelStdout, "hello\nworld")
 	assertNoError(t, err)
 
 	//string alias
 	var sa stringAlias
 	sa = "hello world"
-	err = Log(LoglevelStdout, sa)
+	err = Log(LevelStdout, sa)
 	assertNoError(t, err)
 
 	//implements stringer
 	st := strigger{
 		s: "lorem ipsum",
 	}
-	err = Log(LoglevelStdout, st)
+	err = Log(LevelStdout, st)
 	assertNoError(t, err)
 
 	//implements TextMarshaler
 	tm := textMarchal{
 		"dolor sit amet",
 	}
-	err = Log(LoglevelStdout, tm)
+	err = Log(LevelStdout, tm)
 	assertNoError(t, err)
 
 	// check invalid strings
 	//empty struct
-	err = Log(LoglevelStdout, struct{}{})
+	err = Log(LevelStdout, struct{}{})
 	assertError(t, err)
 	assertEqual(t, "could not turn message into string", err.Error())
 
 	//alias
 	var ia intAlias
 	ia = 1
-	err = Log(LoglevelStdout, ia)
+	err = Log(LevelStdout, ia)
 	assertError(t, err)
 
 	// TextMarshaler error
 	var tme textMarchalError
-	err = Log(LoglevelStdout, tme)
+	err = Log(LevelStdout, tme)
 	assertError(t, err)
 }
 
@@ -108,15 +108,16 @@ func (tm textMarchalError) MarshalText() ([]byte, error) {
 	return nil, fmt.Errorf("An expected error")
 }
 func TestJSONInput(t *testing.T) {
+
 	// marshal test structure and check output
 	tstruct := testStruct{
 		TestField:      "Hello world",
 		OtherTestfield: 1,
 	}
-	tstructExpected := "20::{\"TestField\":\"Hello world\",\"OtherTestfield\":1}"
+	tstructExpected := "20::{\"TestField\":\"Hello world\",\"OtherTestfield\":1}\n"
 
 	// check no error if logged
-	err := Log(LoglevelJSON, tstruct)
+	err := Log(LevelJSON, tstruct)
 	if !assertNoError(t, err) {
 		return
 	}
@@ -126,27 +127,31 @@ func TestJSONInput(t *testing.T) {
 	if !assertNoError(t, err) {
 		return
 	}
-	out := formatLog(LoglevelJSON, string(jsonStr))
 
-	assertEqual(t, tstructExpected, out)
+	var tw testWriter
+	printLog(&tw, LevelJSON, string(jsonStr))
+
+	assertEqual(t, tstructExpected, tw.Val)
 
 	// write a value json can't marshal
-	err = Log(LoglevelJSON, math.Inf(1))
+	err = Log(LevelJSON, math.Inf(1))
 	assertError(t, err)
+
 }
 
 func TestFormatLog(t *testing.T) {
 	input1 := "stdout single line test"
-	expectResult1 := "1::stdout single line test"
-	out1 := formatLog(LoglevelStdout, input1)
+	expectResult1 := "1::stdout single line test\n"
+	var tw testWriter
+	printLog(&tw, LevelStdout, input1)
 
-	assertEqual(t, expectResult1, out1)
+	assertEqual(t, expectResult1, tw.Val)
 
 	input2 := "stderr\nmultiline test"
-	expectResult2 := "2:::\nstderr\nmultiline test\n:::"
-	out2 := formatLog(LoglevelStderr, input2)
+	expectResult2 := "2:::\nstderr\nmultiline test\n:::\n"
+	printLog(&tw, LevelStderr, input2)
 
-	assertEqual(t, expectResult2, out2)
+	assertEqual(t, expectResult2, tw.Val)
 }
 
 func TestMultiline(t *testing.T) {
@@ -166,6 +171,15 @@ multilined string
 type testStruct struct {
 	TestField      string
 	OtherTestfield int
+}
+
+type testWriter struct {
+	Val string
+}
+
+func (tw *testWriter) Write(p []byte) (int, error) {
+	tw.Val = string(p)
+	return len(p), nil
 }
 
 // test assertion
@@ -204,7 +218,7 @@ func assertError(t *testing.T, err error) bool {
 
 func assertEqual(t *testing.T, expected, actual interface{}) bool {
 	if !ObjectsAreEqual(expected, actual) {
-		t.Error("Values were not equal")
+		t.Errorf("Values were not equal\nExpected: %v\nActual: %v\n", expected, actual)
 		return false
 	}
 
@@ -212,7 +226,7 @@ func assertEqual(t *testing.T, expected, actual interface{}) bool {
 }
 
 // equal check
-// soure: github.com/stretchr/testify/assert/assertions.go
+// source: github.com/stretchr/testify/assert/assertions.go
 func ObjectsAreEqual(expected, actual interface{}) bool {
 	if expected == nil || actual == nil {
 		return expected == actual
