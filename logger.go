@@ -62,7 +62,7 @@ func Log(lvl Level, message interface{}) error {
 
 	// check if message is nil
 	if message == nil {
-		return fmt.Errorf("message was nil")
+		return ErrNilMessage
 	}
 
 	switch lvl {

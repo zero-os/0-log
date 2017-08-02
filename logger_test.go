@@ -84,7 +84,7 @@ func TestStringInput(t *testing.T) {
 
 	// TextMarshaler error
 	var tme textMarchalError
-	err = Log(LoglevelStdout, tme)
+	err = Log(LevelStdout, tme)
 	assertError(t, err)
 }
 
