@@ -60,8 +60,8 @@ func Log(lvl Level, message interface{}) error {
 
 	var msgStr string
 
-	// check if message is nil
-	if message == nil {
+	// check if message is nil/empty
+	if message == nil || message == "" {
 		return ErrNilMessage
 	}
 

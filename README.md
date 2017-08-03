@@ -119,7 +119,7 @@ package main
 import zerolog "github.com/zero-os/0-log"
 
 func main() {
-    // print to the zero-os stdout
+    // print to the zero-os stdout (single-line)
     zerolog.Log(zerolog.LevelStdout, "Hello world")
     // output: 1::Hello world 
 
@@ -127,7 +127,8 @@ func main() {
     zerolog.Log(zerolog.LevelStderr, "Hello world")
     // output: 2::Hello world 
 
-    // print multi-line
+    // print a multi-line message
+    // Log() detects if a message is multi-lined and apply the multi-line format
     zerolog.Log(zerolog.LevelStdout, "Hello\nworld")
     /* output: 
     1:::
@@ -135,6 +136,16 @@ func main() {
     world
     :::
     */
+
+    // print a json result message
+	type testStruct struct {
+		Message string `json:"message"`
+	}
+	testStr := testStruct{
+		Message: "Hello world",
+	}
+	zerolog.Log(zerolog.LevelJSON, testStr)
+    // output: 20::{"message":"Hello world"}
 }
 ```
 
