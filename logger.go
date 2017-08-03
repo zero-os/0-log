@@ -53,12 +53,12 @@ var (
 
 // Log prints a message in the 0-Core logging format
 func Log(lvl Level, message interface{}) error {
-	var msgStr string
-
 	// check if message is nil/empty
-	if message == nil || message == "" {
+	if message == nil {
 		return ErrNilMessage
 	}
+
+	var msgStr string
 
 	switch lvl {
 	// string messages
@@ -89,6 +89,10 @@ func Log(lvl Level, message interface{}) error {
 func msgString(msg interface{}) (string, error) {
 	// check if string
 	if str, ok := msg.(string); ok {
+		if str == "" {
+			return "", ErrNilMessage
+		}
+
 		return str, nil
 	}
 

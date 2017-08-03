@@ -1,7 +1,9 @@
 # 0-log
+
 A package that prints out log messages in a format the [0-Core][core] log monitor can read.
 
 ## Format
+
 The logs printed out by this package follow the specs specified in the [logging documentation][monitorFormat] and are formatted as follows:
 
 Single-line:
@@ -40,7 +42,8 @@ func main() {
     // output: 2::Hello world 
 
     // print a multi-line message
-    // Log() detects if a message is multi-lined and apply the multi-line format
+    // Log() detects if a message is multi-lined
+    // and applies the multi-line format if it is
     zerolog.Log(zerolog.LevelStdout, "Hello\nworld")
     /* output: 
     1:::
@@ -53,10 +56,9 @@ func main() {
 	type testStruct struct {
 		Message string `json:"message"`
 	}
-	testStr := testStruct{
-		Message: "Hello world",
-	}
-	zerolog.Log(zerolog.LevelJSON, testStr)
+	zerolog.Log(zerolog.LevelJSON, testStruct{
+        Message: "Hello world",
+    })
     // output: 20::{"message":"Hello world"}
 }
 ```
