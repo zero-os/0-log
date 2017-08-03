@@ -11,19 +11,20 @@ import (
 
 func TestLogLevelSwitch(t *testing.T) {
 	// stdout
-	err := Log(LevelStdout, "")
+	err := Log(LevelStdout, "Hello world")
 	assertNoError(t, err)
 
 	// stderr
-	err = Log(LevelStderr, "")
+	err = Log(LevelStderr, "Hello world")
 	assertNoError(t, err)
 
 	// json
-	err = Log(LevelJSON, "")
+	var ts testStruct
+	err = Log(LevelJSON, ts)
 	assertNoError(t, err)
 
 	// invalid
-	err = Log(255, "")
+	err = Log(255, "Hello world")
 	assertError(t, err)
 	assertEqual(t, ErrLevelNotValid.Error(), err.Error())
 
@@ -31,22 +32,27 @@ func TestLogLevelSwitch(t *testing.T) {
 	err = Log(1, nil)
 	assertError(t, err)
 	assertEqual(t, ErrNilMessage.Error(), err.Error())
+
+	// empty message
+	err = Log(1, "")
+	assertError(t, err)
+	assertEqual(t, ErrNilMessage.Error(), err.Error())
 }
 
 func TestStringInput(t *testing.T) {
 	// check valid strings
 	//normal string
-	err := Log(LevelStdout, "hello\nworld")
+	err := Log(LevelStdout, "Hello\nworld")
 	assertNoError(t, err)
 
 	//string alias
 	var sa stringAlias
-	sa = "hello world"
+	sa = "Hello world"
 	err = Log(LevelStdout, sa)
 	assertNoError(t, err)
 
 	//implements stringer
-	st := strigger{
+	st := stringer{
 		s: "lorem ipsum",
 	}
 	err = Log(LevelStdout, st)
@@ -82,11 +88,11 @@ type stringAlias string
 type intAlias int
 
 // test type that implements fmt.Stringer
-type strigger struct {
+type stringer struct {
 	s string
 }
 
-func (s strigger) String() string {
+func (s stringer) String() string {
 	return s.s
 }
 
