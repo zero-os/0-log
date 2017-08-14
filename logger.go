@@ -11,6 +11,9 @@ Accepted message types may very on provided log level:
 
 String message (e.g.: LevelStdout, LevelStderr) takes strings, string aliases, types that implement fmt.Stringer, types that implement encoding.TextMarshaler.
 
+Stats message (e.g: LevelStats) takes a MsgStat to have fields and validation for data required by the 0-Core statistics monitor
+https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+
 JSON messages (e.g.: LevelJSON) takes any type that can be marshalled to JSON.
 
 Additional info
@@ -40,6 +43,8 @@ const (
 	LevelStdout Level = 1
 	// LevelStderr stderr
 	LevelStderr Level = 2
+	// LevelStats statistics/monitoring message
+	LevelStats Level = 10
 	// LevelJSON JSON result message
 	LevelJSON Level = 20
 )
@@ -59,6 +64,7 @@ func Log(lvl Level, message interface{}) error {
 	}
 
 	var msgStr string
+	var err error
 
 	// check if message is nil/empty
 	if message == nil || message == "" {
@@ -68,8 +74,13 @@ func Log(lvl Level, message interface{}) error {
 	switch lvl {
 	// string messages
 	case LevelStdout, LevelStderr:
-		var err error
 		msgStr, err = msgString(message)
+		if err != nil {
+			return err
+		}
+	// stats messages
+	case LevelStats:
+		msgStr, err = msgStat(message)
 		if err != nil {
 			return err
 		}
@@ -90,7 +101,7 @@ func Log(lvl Level, message interface{}) error {
 	return nil
 }
 
-// checks if the interface can be turned into a string and returns it as such
+// msgString checks if the interface can be turned into a string and returns it as such
 func msgString(msg interface{}) (string, error) {
 	// check if string
 	if str, ok := msg.(string); ok {
@@ -121,6 +132,50 @@ func msgString(msg interface{}) (string, error) {
 	}
 
 	return "", fmt.Errorf("could not turn message into string")
+}
+
+// msgStat validates and formats a statistics log message
+// validates if message conforms to 0-core statistics spec:
+// https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+func msgStat(msg interface{}) (string, error) {
+	// check if msg is type MsgStat
+	statMsg, ok := msg.(MsgStat)
+	if !ok {
+		return "", fmt.Errorf("statistics log message was not of type MsgStat")
+	}
+
+	err := statMsg.Validate()
+	if err != nil {
+		return "", err
+	}
+
+	str := fmt.Sprintf("%s:%f|%s", statMsg.Key, statMsg.Value, statMsg.OP)
+
+	if statMsg.Tags != "" {
+		str = str + "|" + statMsg.Tags
+	}
+
+	return str, nil
+}
+
+// MsgStat represents the data needed for a statistics message
+type MsgStat struct {
+	Key   string
+	Value float64
+	OP    string
+	Tags  string
+}
+
+// Validate validates the MsgStat according to spec:
+// https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+func (msg *MsgStat) Validate() error {
+	if msg.Key == "" {
+		return fmt.Errorf("stats message does not contain a key")
+	}
+	if msg.OP != "A" && msg.OP != "D" {
+		return fmt.Errorf("stats message contains invalid OP")
+	}
+	return nil
 }
 
 // printLog formats the log and writes it to the io.Writer

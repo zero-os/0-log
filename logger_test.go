@@ -82,10 +82,10 @@ func TestStringInput(t *testing.T) {
 	err = Log(LevelStdout, tme)
 	assertError(t, err)
 
-	// TextMarshaler error
-	var tme textMarchalError
-	err = Log(LevelStdout, tme)
+	//empty string in msgString
+	_, err = msgString("")
 	assertError(t, err)
+	assertEqual(t, ErrNilMessage, err)
 }
 
 // test types for TestStringInput
@@ -118,8 +118,63 @@ type textMarchalError struct {
 func (tm textMarchalError) MarshalText() ([]byte, error) {
 	return nil, fmt.Errorf("An expected error")
 }
-func TestJSONInput(t *testing.T) {
 
+func TestStatsInput(t *testing.T) {
+	valFullStatMsg := MsgStat{
+		Key:   "somekey",
+		Value: 123.456,
+		OP:    "A",
+		Tags:  "foo=bar,hello=world",
+	}
+	// test message formatting
+	str, err := msgStat(valFullStatMsg)
+	if !assertNoError(t, err) || !assertNotEqual(t, "", str) {
+		return
+	}
+	if !assertEqual(t, "somekey:123.456000|A|foo=bar,hello=world", str) {
+		return
+	}
+
+	// test invalid  message
+	_, err = msgStat("")
+	if !assertError(t, err) {
+		return
+	}
+
+	invalKey := MsgStat{
+		Key:   "",
+		Value: 123.456,
+		OP:    "A",
+		Tags:  "foo=bar,hello=world",
+	}
+	_, err = msgStat(invalKey)
+	if !assertError(t, err) {
+		return
+	}
+
+	invalOP := MsgStat{
+		Key:   "someKey",
+		Value: 123.456,
+		OP:    "B",
+		Tags:  "foo=bar,hello=world",
+	}
+	_, err = msgStat(invalOP)
+	if !assertError(t, err) {
+		return
+	}
+
+	// test logging valid Stats messages
+	err = Log(LevelStats, valFullStatMsg)
+	if !assertNoError(t, err) {
+		return
+	}
+
+	// test logging invalid Stats messages
+	err = Log(LevelStats, invalKey)
+	assertError(t, err)
+}
+
+func TestJSONInput(t *testing.T) {
 	// marshal test structure and check output
 	tstruct := testStruct{
 		TestField:      "Hello world",
@@ -193,7 +248,8 @@ func (tw *testWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// test assertion
+// --------------------------------------------------------
+// test assertions
 func assertTrue(t *testing.T, val bool) bool {
 	if !val {
 		t.Error("Expected True, got False")
@@ -230,6 +286,15 @@ func assertError(t *testing.T, err error) bool {
 func assertEqual(t *testing.T, expected, actual interface{}) bool {
 	if !ObjectsAreEqual(expected, actual) {
 		t.Errorf("Values were not equal\nExpected: %v\nActual: %v\n", expected, actual)
+		return false
+	}
+
+	return true
+}
+
+func assertNotEqual(t *testing.T, expected, actual interface{}) bool {
+	if ObjectsAreEqual(expected, actual) {
+		t.Errorf("Values were equal\nExpected: %v\nActual: %v\n", expected, actual)
 		return false
 	}
 
