@@ -61,7 +61,7 @@ func main() {
 		OP:    "A",
 		Tags:  "foo=bar,hello=world",
 	}
-    zerolog.Log(LevelStats, msgStat)
+    zerolog.Log(LevelStatistics, msgStat)
     // output: 10::somekey:123.456000|A|foo=bar,hello=world
 
     // print a json result message
