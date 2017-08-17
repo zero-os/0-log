@@ -58,9 +58,10 @@ func main() {
 	msgStat := zerolog.MsgStatistics{
 		// statistic key (required)
 		Key: "somekey",
-		// statistic value (required, can be 0)
+		// statistic value (float)
+        // (required)
 		Value: 123.456,
-		// statistic aggregation type (average or differentiate)
+		// statistic aggregation strategy (average or differentiate)
 		// (required)
 		OP: zerolog.AggregationAverages,
 		// statistics tags map (optional)

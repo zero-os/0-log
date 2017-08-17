@@ -5,97 +5,141 @@ import (
 	"fmt"
 	"math"
 	"testing"
-
-	"github.com/zero-os/0-log/assert"
 )
 
 func TestLogLevelSwitch(t *testing.T) {
 	// stdout
 	err := Log(LevelStdout, "Hello world")
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	// stderr
 	err = Log(LevelStderr, "Hello world")
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	// json
 	var ts testStruct
 	err = Log(LevelJSON, ts)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	// invalid
 	err = Log(255, "Hello world")
-	assert.Error(t, err)
-	assert.Equal(t, ErrLevelNotValid.Error(), err.Error())
+	if err == nil {
+		t.Error("expected an error")
+	}
+	if err.Error() != ErrLevelNotValid.Error() {
+		t.Error("unexpected error message")
+	}
 
 	// nil message
 	err = Log(1, nil)
-	assert.Error(t, err)
-	assert.Equal(t, ErrNilMessage.Error(), err.Error())
+	if err == nil {
+		t.Error("expected an error")
+	}
+	if err.Error() != ErrNilMessage.Error() {
+		t.Error("unexpected error message")
+	}
 
 	// empty message
 	err = Log(1, "")
-	assert.Error(t, err)
-	assert.Equal(t, ErrNilMessage.Error(), err.Error())
+	if err == nil {
+		t.Error("expected an error")
+	}
+	if err.Error() != ErrNilMessage.Error() {
+		t.Errorf("unexpected error message %s", err)
+	}
 
 	// test nil messages
 	err = Log(LevelStderr, nil)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 	err = Log(LevelStdout, nil)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 	err = Log(LevelJSON, nil)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 	err = Log(LevelStatistics, nil)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 }
 
 func TestStringInput(t *testing.T) {
 	// check valid strings
 	//normal string
 	err := Log(LevelStdout, "Hello\nworld")
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	//string alias
 	var sa stringAlias
 	sa = "Hello world"
 	err = Log(LevelStdout, sa)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	//implements stringer
 	st := stringer{
 		s: "lorem ipsum",
 	}
 	err = Log(LevelStdout, st)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	//implements TextMarshaler
 	tm := textMarshal{
 		"dolor sit amet",
 	}
 	err = Log(LevelStdout, tm)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	// check invalid strings
 	//empty struct
 	err = Log(LevelStdout, struct{}{})
-	assert.Error(t, err)
-	assert.Equal(t, "could not turn message into string", err.Error())
+	if err == nil {
+		t.Error("expected an error")
+	}
+	if err.Error() != "could not turn message into string" {
+		t.Errorf("unexpected error message: %s", err)
+	}
 
 	//alias
 	var ia intAlias
 	ia = 1
 	err = Log(LevelStdout, ia)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 
 	// TextMarshaler error
 	var tme textMarchalError
 	err = Log(LevelStdout, tme)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 
 	//empty string in msgString
 	_, err = msgString("")
-	assert.Error(t, err)
-	assert.Equal(t, ErrNilMessage, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
+	if err.Error() != ErrNilMessage.Error() {
+		t.Errorf("unexpected error: %s", err)
+	}
 }
 
 // test types for TestStringInput
@@ -140,17 +184,20 @@ func TestStatsInput(t *testing.T) {
 	}
 	// test message formatting
 	str, err := msgStatistics(valFullStatMsg)
-	if !assert.NoError(t, err) || !assert.NotEqual(t, "", str) {
-		return
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
-	if !assert.Equal(t, "somekey:123.456000|A|foo=bar", str) {
-		return
+	if str == "" {
+		t.Error("unexpected empty result")
+	}
+	if str != "somekey:123.456000|A|foo=bar" {
+		t.Errorf("unexpected result: %s", str)
 	}
 
 	// test invalid  message
 	_, err = msgStatistics("")
-	if !assert.Error(t, err) {
-		return
+	if err == nil {
+		t.Error("expected an error")
 	}
 
 	invalKey := MsgStatistics{
@@ -162,8 +209,8 @@ func TestStatsInput(t *testing.T) {
 		},
 	}
 	_, err = msgStatistics(invalKey)
-	if !assert.Error(t, err) {
-		return
+	if err == nil {
+		t.Error("expected an error")
 	}
 
 	invalOP := MsgStatistics{
@@ -175,19 +222,21 @@ func TestStatsInput(t *testing.T) {
 		},
 	}
 	_, err = msgStatistics(invalOP)
-	if !assert.Error(t, err) {
-		return
+	if err == nil {
+		t.Error("expected an error")
 	}
 
 	// test logging valid Stats messages
 	err = Log(LevelStatistics, valFullStatMsg)
-	if !assert.NoError(t, err) {
-		return
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
 
 	// test logging invalid Stats messages
 	err = Log(LevelStatistics, invalKey)
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 }
 
 func TestJSONInput(t *testing.T) {
@@ -201,28 +250,34 @@ func TestJSONInput(t *testing.T) {
 
 	// check no error if logged
 	err := Log(LevelJSON, tstruct)
-	if !assert.NoError(t, err) {
-		return
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
 
 	// check output is as expected
 	jsonStr, err := json.Marshal(tstruct)
-	if !assert.NoError(t, err) {
-		return
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
 
 	var tw testWriter
 	printLog(&tw, LevelJSON, string(jsonStr))
 
-	assert.Equal(t, tstructExpected, tw.Val)
+	if tw.Val != tstructExpected {
+		t.Errorf("unexpected result: %s", tw.Val)
+	}
 
 	// write a value json can't marshal
 	err = Log(LevelJSON, math.Inf(1))
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("expected an error")
+	}
 
 	// check formatted string output
 	str, err := msgJSON(tstruct)
-	assert.Equal(t, tstructExpectedNoLogPrefix, str)
+	if str != tstructExpectedNoLogPrefix {
+		t.Errorf("unexpected result: %s", str)
+	}
 }
 
 func TestFormatLog(t *testing.T) {
@@ -231,13 +286,17 @@ func TestFormatLog(t *testing.T) {
 	var tw testWriter
 	printLog(&tw, LevelStdout, input1)
 
-	assert.Equal(t, expectResult1, tw.Val)
+	if tw.Val != expectResult1 {
+		t.Errorf("unexpected result: %s", tw.Val)
+	}
 
 	input2 := "stderr\nmultiline test"
 	expectResult2 := "2:::\nstderr\nmultiline test\n:::\n"
 	printLog(&tw, LevelStderr, input2)
 
-	assert.Equal(t, expectResult2, tw.Val)
+	if tw.Val != expectResult2 {
+		t.Errorf("unexpected result: %s", tw.Val)
+	}
 }
 
 func TestMultiline(t *testing.T) {
@@ -249,9 +308,15 @@ multilined string
 	str2 := "This one\nis too"
 	str3 := "this one is not"
 
-	assert.True(t, isMultiline(str1))
-	assert.True(t, isMultiline(str2))
-	assert.False(t, isMultiline(str3))
+	if !isMultiline(str1) {
+		t.Error("should be true")
+	}
+	if !isMultiline(str2) {
+		t.Error("should be true")
+	}
+	if isMultiline(str3) {
+		t.Error("should be false")
+	}
 }
 
 type testStruct struct {
@@ -274,26 +339,38 @@ func TestAggregationType(t *testing.T) {
 	var z AggregationType
 	z = "z"
 
-	assert.NoError(t, a.Validate())
-	assert.NoError(t, d.Validate())
-	assert.Error(t, z.Validate())
+	if err := a.Validate(); err != nil {
+		t.Errorf("unexpected error %s", err)
+	}
+	if err := d.Validate(); err != nil {
+		t.Errorf("unexpected error %s", err)
+	}
+	if err := z.Validate(); err == nil {
+		t.Error("expected an error")
+	}
 }
 
 func TestMetricTags(t *testing.T) {
 	emptyTags := MetricTags{}
-	assert.Equal(t, "", emptyTags.String())
+	if emptyTags.String() != "" {
+		t.Errorf("unexpected result: %s", emptyTags.String())
+	}
 
 	mockTagsString := MetricTags{
 		"foo":   "bar",
 		"hello": "world",
 	}
-	assert.NoError(t, checkMetricsResult(mockTagsString))
+	if err := checkMetricsResult(mockTagsString); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	mockTagsByteSlice := MetricTags{
 		"foo":   []byte("bar"),
 		"hello": []byte("world"),
 	}
-	assert.NoError(t, checkMetricsResult(mockTagsByteSlice))
+	if err := checkMetricsResult(mockTagsByteSlice); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	barS := metricResultStringer{s: "bar"}
 	worldS := metricResultStringer{s: "world"}
@@ -301,7 +378,9 @@ func TestMetricTags(t *testing.T) {
 		"foo":   barS,
 		"hello": worldS,
 	}
-	assert.NoError(t, checkMetricsResult(mockTagsStringer))
+	if err := checkMetricsResult(mockTagsStringer); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	barTM := metricResultTextMarshall{s: "bar"}
 	worldTM := metricResultTextMarshall{s: "world"}
@@ -309,7 +388,9 @@ func TestMetricTags(t *testing.T) {
 		"foo":   barTM,
 		"hello": worldTM,
 	}
-	assert.NoError(t, checkMetricsResult(mockTagsTextMarshal))
+	if err := checkMetricsResult(mockTagsTextMarshal); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 
 	// test last resort
 	barAnon := metricResultAnon{s: "bar"}
@@ -318,8 +399,9 @@ func TestMetricTags(t *testing.T) {
 		"foo":   barAnon,
 		"hello": worldAnon,
 	}
-	assert.NoError(t, checkMetricsResult(mockTagsAnon))
-
+	if err := checkMetricsResult(mockTagsAnon); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
 }
 
 func checkMetricsResult(mt MetricTags) error {
