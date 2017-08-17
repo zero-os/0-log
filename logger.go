@@ -11,8 +11,12 @@ Accepted message types may very on provided log level:
 
 String message (e.g.: LevelStdout, LevelStderr) takes strings, string aliases, types that implement fmt.Stringer, types that implement encoding.TextMarshaler.
 
-Stats message (e.g: LevelStatistics) takes a MsgStat to have fields and validation for data required by the 0-Core statistics monitor
+Stats message (e.g: LevelStatistics) takes a MsgStatistics to have fields and validation for data required by the 0-Core statistics monitor
 https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+
+The MsgStatistics OP field takes an AggregationType which defines the data aggregation strategy for the 0-core
+
+The MsgStatistics Tags field takes a MetricTags type which is a map with a string as key and an interface as value. When logging this map is formatted to a flat string, if the value is a string it will simply be added to the formatted string, if not it will check the value implements the fmt.Stringer or encoding.TextMarshaler interfaces, as a last resort the value will be turned into a string using fmt.Sprint.
 
 JSON messages (e.g.: LevelJSON) takes any type that can be marshalled to JSON.
 
@@ -70,20 +74,16 @@ func Log(lvl Level, message interface{}) error {
 		}
 	// stats messages
 	case LevelStatistics:
-		msgStr, err = msgStat(message)
+		msgStr, err = msgStatistics(message)
 		if err != nil {
 			return err
 		}
 	// json messages
 	case LevelJSON:
-		if message == nil {
-			return ErrNilMessage
-		}
-		msgBs, err := json.Marshal(message)
+		msgStr, err = msgJSON(message)
 		if err != nil {
-			return fmt.Errorf("could not marshal provided message into JSON: %s", err)
+			return err
 		}
-		msgStr = string(msgBs)
 	default:
 		return ErrLevelNotValid
 	}
@@ -130,14 +130,14 @@ func msgString(msg interface{}) (string, error) {
 	return "", fmt.Errorf("could not turn message into string")
 }
 
-// msgStat validates and formats a statistics log message
+// msgStatistics validates and formats a statistics log message
 // validates if message conforms to 0-core statistics spec:
 // https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
-func msgStat(msg interface{}) (string, error) {
-	// check if msg is type MsgStat
-	statMsg, ok := msg.(MsgStat)
+func msgStatistics(msg interface{}) (string, error) {
+	// check if msg is type MsgStatistics
+	statMsg, ok := msg.(MsgStatistics)
 	if !ok {
-		return "", fmt.Errorf("statistics log message was not of type MsgStat")
+		return "", fmt.Errorf("statistics log message was not of type MsgStatistics")
 	}
 
 	err := statMsg.Validate()
@@ -147,24 +147,37 @@ func msgStat(msg interface{}) (string, error) {
 
 	str := fmt.Sprintf("%s:%f|%s", statMsg.Key, statMsg.Value, statMsg.OP)
 
-	if statMsg.Tags != nil {
+	if len(statMsg.Tags) != 0 {
 		str = str + "|" + statMsg.Tags.String()
 	}
 
 	return str, nil
 }
 
-// MsgStat represents the data needed for a statistics message
-type MsgStat struct {
+// msgJSON validates and formats a JSON result message
+func msgJSON(msg interface{}) (string, error) {
+	if msg == nil {
+		return "", ErrNilMessage
+	}
+	msgBs, err := json.Marshal(msg)
+	if err != nil {
+		return "", fmt.Errorf("could not marshal provided message into JSON: %s", err)
+	}
+
+	return string(msgBs), nil
+}
+
+// MsgStatistics represents the data needed for a statistics message
+type MsgStatistics struct {
 	Key   string
 	Value float64
 	OP    AggregationType
 	Tags  MetricTags
 }
 
-// Validate validates the MsgStat according to spec:
+// Validate validates the MsgStatistics according to spec:
 // https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
-func (msg *MsgStat) Validate() error {
+func (msg *MsgStatistics) Validate() error {
 	if msg.Key == "" {
 		return fmt.Errorf("stats message does not contain a key")
 	}

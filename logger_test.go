@@ -130,7 +130,7 @@ func (tm textMarchalError) MarshalText() ([]byte, error) {
 }
 
 func TestStatsInput(t *testing.T) {
-	valFullStatMsg := MsgStat{
+	valFullStatMsg := MsgStatistics{
 		Key:   "somekey",
 		Value: 123.456,
 		OP:    AggregationAverages,
@@ -139,7 +139,7 @@ func TestStatsInput(t *testing.T) {
 		},
 	}
 	// test message formatting
-	str, err := msgStat(valFullStatMsg)
+	str, err := msgStatistics(valFullStatMsg)
 	if !assert.NoError(t, err) || !assert.NotEqual(t, "", str) {
 		return
 	}
@@ -148,12 +148,12 @@ func TestStatsInput(t *testing.T) {
 	}
 
 	// test invalid  message
-	_, err = msgStat("")
+	_, err = msgStatistics("")
 	if !assert.Error(t, err) {
 		return
 	}
 
-	invalKey := MsgStat{
+	invalKey := MsgStatistics{
 		Key:   "",
 		Value: 123.456,
 		OP:    AggregationDifferentiates,
@@ -161,12 +161,12 @@ func TestStatsInput(t *testing.T) {
 			"foo": "bar",
 		},
 	}
-	_, err = msgStat(invalKey)
+	_, err = msgStatistics(invalKey)
 	if !assert.Error(t, err) {
 		return
 	}
 
-	invalOP := MsgStat{
+	invalOP := MsgStatistics{
 		Key:   "someKey",
 		Value: 123.456,
 		OP:    "B",
@@ -174,7 +174,7 @@ func TestStatsInput(t *testing.T) {
 			"foo": "bar",
 		},
 	}
-	_, err = msgStat(invalOP)
+	_, err = msgStatistics(invalOP)
 	if !assert.Error(t, err) {
 		return
 	}
@@ -197,6 +197,7 @@ func TestJSONInput(t *testing.T) {
 		OtherTestfield: 1,
 	}
 	tstructExpected := "20::{\"TestField\":\"Hello world\",\"OtherTestfield\":1}\n"
+	tstructExpectedNoLogPrefix := "{\"TestField\":\"Hello world\",\"OtherTestfield\":1}"
 
 	// check no error if logged
 	err := Log(LevelJSON, tstruct)
@@ -219,6 +220,9 @@ func TestJSONInput(t *testing.T) {
 	err = Log(LevelJSON, math.Inf(1))
 	assert.Error(t, err)
 
+	// check formatted string output
+	str, err := msgJSON(tstruct)
+	assert.Equal(t, tstructExpectedNoLogPrefix, str)
 }
 
 func TestFormatLog(t *testing.T) {

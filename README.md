@@ -55,14 +55,22 @@ func main() {
     */
 
     // print a statistics message
-    msgStat := MsgStat{
-		Key:   "somekey",
+	msgStat := zerolog.MsgStatistics{
+		// statistic key (required)
+		Key: "somekey",
+		// statistic value (required, can be 0)
 		Value: 123.456,
-		OP:    "A",
-		Tags:  "foo=bar,hello=world",
+		// statistic aggregation type (average or differentiate)
+		// (required)
+		OP: zerolog.AggregationAverages,
+		// statistics tags map (optional)
+		Tags: zerolog.MetricTags{
+			"foo":   "bar",
+			"hello": "world",
+		},
 	}
-    zerolog.Log(LevelStatistics, msgStat)
-    // output: 10::somekey:123.456000|A|foo=bar,hello=world
+	zerolog.Log(zerolog.LevelStatistics, msgStat)
+	// output: 10::somekey:123.456000|A|foo=bar,hello=world
 
     // print a json result message
 	type testStruct struct {
