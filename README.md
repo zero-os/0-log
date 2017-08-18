@@ -63,7 +63,7 @@ func main() {
         Value: 123.456,
         // statistic aggregation strategy (average or differentiate)
         // (required)
-        OP: zerolog.AggregationAverages,
+        Operation: zerolog.AggregationAverages,
         // statistics tags map (optional)
         Tags: zerolog.MetricTags{
             "foo":   "bar",
