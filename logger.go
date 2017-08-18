@@ -1,4 +1,4 @@
-/*Package zerolog is a package that prints messages in a format the 0-Core log monitor can read and use for logging, statistics, selfhealing and other features.
+/*Package zerolog is a package that prints messages in a format the 0-Core log monitor can read and use for logging (errors), statistics, selfhealing and other features.
 
 Usage:
 	zerolog.Log(zerolog.LevelStdout, "Hello world")
@@ -11,7 +11,7 @@ Accepted message types may very on provided log level:
 
 String message (e.g.: LevelStdout, LevelStderr) takes strings, string aliases, types that implement fmt.Stringer, types that implement encoding.TextMarshaler.
 
-Stats message (e.g: LevelStatistics) takes a MsgStatistics to have fields and validation for data required by the 0-Core statistics monitor
+Statistics message (e.g: LevelStatistics) takes a MsgStatistics to have fields and validation for data required by the 0-Core statistics monitor
 https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
 
 The MsgStatistics OP field takes an AggregationType which defines the data aggregation strategy for the 0-core
@@ -131,7 +131,7 @@ func msgString(msg interface{}) (string, error) {
 }
 
 // msgStatistics validates and formats a statistics log message
-// validates if message conforms to 0-core statistics spec:
+// Validates if message conforms to 0-core statistics spec:
 // https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
 func msgStatistics(msg interface{}) (string, error) {
 	// check if msg is type MsgStatistics
@@ -216,7 +216,6 @@ func (mt MetricTags) String() string {
 	}
 
 	var str string
-
 	for k, v := range mt {
 		str = str + k + "=" + tagValString(v) + ","
 	}
