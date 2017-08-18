@@ -1,86 +1,101 @@
 package zerolog
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
-	"reflect"
 	"testing"
+
+	"github.com/zero-os/0-log/assert"
 )
 
 func TestLogLevelSwitch(t *testing.T) {
 	// stdout
 	err := Log(LevelStdout, "Hello world")
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	// stderr
 	err = Log(LevelStderr, "Hello world")
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	// json
 	var ts testStruct
 	err = Log(LevelJSON, ts)
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	// invalid
 	err = Log(255, "Hello world")
-	assertError(t, err)
-	assertEqual(t, ErrLevelNotValid.Error(), err.Error())
+	assert.Error(t, err)
+	assert.Equal(t, ErrLevelNotValid, err)
 
 	// nil message
 	err = Log(1, nil)
-	assertError(t, err)
-	assertEqual(t, ErrNilMessage.Error(), err.Error())
+	assert.Error(t, err)
+	assert.Equal(t, ErrNilMessage, err)
 
 	// empty message
 	err = Log(1, "")
-	assertError(t, err)
-	assertEqual(t, ErrNilMessage.Error(), err.Error())
+	assert.Error(t, err)
+	assert.Equal(t, ErrNilMessage, err)
+
+	// test nil messages
+	err = Log(LevelStderr, nil)
+	assert.Error(t, err)
+	err = Log(LevelStdout, nil)
+	assert.Error(t, err)
+	err = Log(LevelJSON, nil)
+	assert.Error(t, err)
+	err = Log(LevelStatistics, nil)
+	assert.Error(t, err)
 }
 
 func TestStringInput(t *testing.T) {
 	// check valid strings
 	//normal string
 	err := Log(LevelStdout, "Hello\nworld")
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	//string alias
 	var sa stringAlias
 	sa = "Hello world"
 	err = Log(LevelStdout, sa)
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	//implements stringer
 	st := stringer{
 		s: "lorem ipsum",
 	}
 	err = Log(LevelStdout, st)
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	//implements TextMarshaler
-	tm := textMarchal{
+	tm := textMarshal{
 		"dolor sit amet",
 	}
 	err = Log(LevelStdout, tm)
-	assertNoError(t, err)
+	assert.NoError(t, err)
 
 	// check invalid strings
 	//empty struct
 	err = Log(LevelStdout, struct{}{})
-	assertError(t, err)
-	assertEqual(t, "could not turn message into string", err.Error())
+	assert.Error(t, err)
+	assert.Equal(t, "could not turn message into string", err.Error())
 
 	//alias
 	var ia intAlias
 	ia = 1
 	err = Log(LevelStdout, ia)
-	assertError(t, err)
+	assert.Error(t, err)
 
 	// TextMarshaler error
 	var tme textMarchalError
 	err = Log(LevelStdout, tme)
-	assertError(t, err)
+	assert.Error(t, err)
+
+	//empty string in msgString
+	_, err = msgString("")
+	assert.Error(t, err)
+	assert.Equal(t, ErrNilMessage, err)
 }
 
 // test types for TestStringInput
@@ -97,11 +112,11 @@ func (s stringer) String() string {
 }
 
 // test type that implements encoding.TextMarshaler
-type textMarchal struct {
+type textMarshal struct {
 	s string
 }
 
-func (tm textMarchal) MarshalText() ([]byte, error) {
+func (tm textMarshal) MarshalText() ([]byte, error) {
 	return []byte(tm.s), nil
 }
 
@@ -113,51 +128,101 @@ type textMarchalError struct {
 func (tm textMarchalError) MarshalText() ([]byte, error) {
 	return nil, fmt.Errorf("An expected error")
 }
-func TestJSONInput(t *testing.T) {
 
+func TestStatsInput(t *testing.T) {
+	valFullStatMsg := MsgStatistics{
+		Key:   "somekey",
+		Value: 123.456,
+		OP:    AggregationAverages,
+		Tags: map[string]interface{}{
+			"foo": "bar",
+		},
+	}
+
+	// test message formatting
+	str, err := msgStatistics(valFullStatMsg)
+	assert.NoError(t, err)
+	assert.Equal(t, "somekey:123.456000|A|foo=bar", str)
+
+	// test full log output
+	var tw testWriter
+	printLog(&tw, LevelStatistics, str)
+	assert.Equal(t, "10::somekey:123.456000|A|foo=bar\n", tw.Val)
+
+	// test invalid  message
+	_, err = msgStatistics("")
+	assert.Error(t, err)
+
+	invalKey := MsgStatistics{
+		Key:   "",
+		Value: 123.456,
+		OP:    AggregationDifferentiates,
+		Tags: map[string]interface{}{
+			"foo": "bar",
+		},
+	}
+	_, err = msgStatistics(invalKey)
+	assert.Error(t, err)
+
+	invalOP := MsgStatistics{
+		Key:   "someKey",
+		Value: 123.456,
+		OP:    "B",
+		Tags: map[string]interface{}{
+			"foo": "bar",
+		},
+	}
+	_, err = msgStatistics(invalOP)
+	assert.Error(t, err)
+
+	// test logging valid Stats messages
+	err = Log(LevelStatistics, valFullStatMsg)
+	assert.NoError(t, err)
+
+	// test logging invalid Stats messages
+	err = Log(LevelStatistics, invalKey)
+	assert.Error(t, err)
+}
+
+func TestJSONInput(t *testing.T) {
 	// marshal test structure and check output
 	tstruct := testStruct{
 		TestField:      "Hello world",
 		OtherTestfield: 1,
 	}
-	tstructExpected := "20::{\"TestField\":\"Hello world\",\"OtherTestfield\":1}\n"
 
-	// check no error if logged
+	// check no error is logged
 	err := Log(LevelJSON, tstruct)
-	if !assertNoError(t, err) {
-		return
-	}
+	assert.NoError(t, err)
 
 	// check output is as expected
 	jsonStr, err := json.Marshal(tstruct)
-	if !assertNoError(t, err) {
-		return
-	}
+	assert.NoError(t, err)
 
 	var tw testWriter
 	printLog(&tw, LevelJSON, string(jsonStr))
 
-	assertEqual(t, tstructExpected, tw.Val)
+	assert.Equal(t, "20::{\"TestField\":\"Hello world\",\"OtherTestfield\":1}\n", tw.Val)
 
 	// write a value json can't marshal
 	err = Log(LevelJSON, math.Inf(1))
-	assertError(t, err)
+	assert.Error(t, err)
 
+	// check formatted string output
+	str, err := msgJSON(tstruct)
+	assert.Equal(t, "{\"TestField\":\"Hello world\",\"OtherTestfield\":1}", str)
 }
 
-func TestFormatLog(t *testing.T) {
+func TestPrintLog(t *testing.T) {
 	input1 := "stdout single line test"
-	expectResult1 := "1::stdout single line test\n"
 	var tw testWriter
 	printLog(&tw, LevelStdout, input1)
-
-	assertEqual(t, expectResult1, tw.Val)
+	assert.Equal(t, "1::stdout single line test\n", tw.Val)
 
 	input2 := "stderr\nmultiline test"
-	expectResult2 := "2:::\nstderr\nmultiline test\n:::\n"
 	printLog(&tw, LevelStderr, input2)
+	assert.Equal(t, "2:::\nstderr\nmultiline test\n:::\n", tw.Val)
 
-	assertEqual(t, expectResult2, tw.Val)
 }
 
 func TestMultiline(t *testing.T) {
@@ -169,9 +234,9 @@ multilined string
 	str2 := "This one\nis too"
 	str3 := "this one is not"
 
-	assertTrue(t, isMultiline(str1))
-	assertTrue(t, isMultiline(str2))
-	assertFalse(t, isMultiline(str3))
+	assert.True(t, isMultiline(str1))
+	assert.True(t, isMultiline(str2))
+	assert.False(t, isMultiline(str3))
 }
 
 type testStruct struct {
@@ -188,65 +253,88 @@ func (tw *testWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// test assertion
-func assertTrue(t *testing.T, val bool) bool {
-	if !val {
-		t.Error("Expected True, got False")
-		return false
-	}
-	return true
+func TestAggregationType(t *testing.T) {
+	a := AggregationAverages
+	d := AggregationDifferentiates
+	var z AggregationType
+	z = "z"
+
+	assert.NoError(t, a.Validate())
+	assert.NoError(t, d.Validate())
+	assert.Error(t, z.Validate())
 }
 
-func assertFalse(t *testing.T, val bool) bool {
-	if val {
-		t.Error("Expected False, got True")
-		return false
+func TestMetricTags(t *testing.T) {
+	emptyTags := MetricTags{}
+	assert.Equal(t, "", emptyTags.String())
+
+	mockTagsString := MetricTags{
+		"foo":   "bar",
+		"hello": "world",
 	}
-	return true
+	assert.NoError(t, checkMetricsResult(mockTagsString))
+
+	mockTagsByteSlice := MetricTags{
+		"foo":   []byte("bar"),
+		"hello": []byte("world"),
+	}
+	assert.NoError(t, checkMetricsResult(mockTagsByteSlice))
+
+	barS := metricResultStringer{s: "bar"}
+	worldS := metricResultStringer{s: "world"}
+	mockTagsStringer := MetricTags{
+		"foo":   barS,
+		"hello": worldS,
+	}
+	assert.NoError(t, checkMetricsResult(mockTagsStringer))
+
+	barTM := metricResultTextMarshall{s: "bar"}
+	worldTM := metricResultTextMarshall{s: "world"}
+	mockTagsTextMarshal := MetricTags{
+		"foo":   barTM,
+		"hello": worldTM,
+	}
+	assert.NoError(t, checkMetricsResult(mockTagsTextMarshal))
+
+	// test last resort
+	barAnon := metricResultAnon{s: "bar"}
+	worldAnon := metricResultAnon{s: "world"}
+	mockTagsAnon := MetricTags{
+		"foo":   barAnon,
+		"hello": worldAnon,
+	}
+	assert.NoError(t, checkMetricsResult(mockTagsAnon))
 }
-func assertNoError(t *testing.T, err error) bool {
-	if err != nil {
-		t.Errorf("Did not expect error, got: %s", err)
-		return false
-	}
 
-	return true
+func checkMetricsResult(mt MetricTags) error {
+	// order is not guaranteed
+	switch mt.String() {
+	case "foo=bar,hello=world", "hello=world,foo=bar":
+		return nil
+	// for last resort check
+	case "foo={bar},hello={world}", "hello={world},foo={bar}":
+		return nil
+	default:
+		return fmt.Errorf("unexpected MetricTags result: %s", mt)
+	}
 }
 
-func assertError(t *testing.T, err error) bool {
-	if err == nil {
-		t.Error("Expected an error, got nil")
-		return false
-	}
-
-	return true
+type metricResultStringer struct {
+	s string
 }
 
-func assertEqual(t *testing.T, expected, actual interface{}) bool {
-	if !ObjectsAreEqual(expected, actual) {
-		t.Errorf("Values were not equal\nExpected: %v\nActual: %v\n", expected, actual)
-		return false
-	}
-
-	return true
+func (mrs metricResultStringer) String() string {
+	return mrs.s
 }
 
-// equal check
-// source: github.com/stretchr/testify/assert/assertions.go
-func ObjectsAreEqual(expected, actual interface{}) bool {
-	if expected == nil || actual == nil {
-		return expected == actual
-	}
+type metricResultTextMarshall struct {
+	s string
+}
 
-	if exp, ok := expected.([]byte); ok {
-		act, ok := actual.([]byte)
-		if !ok {
-			return false
-		} else if exp == nil || act == nil {
-			return exp == nil && act == nil
-		}
-		return bytes.Equal(exp, act)
-	}
+func (mrtm metricResultTextMarshall) MarshalText() ([]byte, error) {
+	return []byte(mrtm.s), nil
+}
 
-	return reflect.DeepEqual(expected, actual)
+type metricResultAnon struct {
+	s string
 }

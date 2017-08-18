@@ -1,4 +1,4 @@
-/*Package zerolog is a package that prints messages in a format the 0-Core log monitor can read and use for logging, statistics, selfhealing and other features.
+/*Package zerolog is a package that prints messages in a format the 0-Core log monitor can read and use for logging (errors), statistics, selfhealing and other features.
 
 Usage:
 	zerolog.Log(zerolog.LevelStdout, "Hello world")
@@ -10,6 +10,13 @@ Message
 Accepted message types may very on provided log level:
 
 String message (e.g.: LevelStdout, LevelStderr) takes strings, string aliases, types that implement fmt.Stringer, types that implement encoding.TextMarshaler.
+
+Statistics message (e.g: LevelStatistics) takes a MsgStatistics to have fields and validation for data required by the 0-Core statistics monitor
+https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+
+The MsgStatistics OP field takes an AggregationType which defines the data aggregation strategy for the 0-core
+
+The MsgStatistics Tags field takes a MetricTags type which is a map with a string as key and an interface as value. When logging this map is formatted to a flat string, if the value is a string it will simply be added to the formatted string, if not it will check the value implements the fmt.Stringer or encoding.TextMarshaler interfaces, as a last resort the value will be turned into a string using fmt.Sprint.
 
 JSON messages (e.g.: LevelJSON) takes any type that can be marshalled to JSON.
 
@@ -40,6 +47,8 @@ const (
 	LevelStdout Level = 1
 	// LevelStderr stderr
 	LevelStderr Level = 2
+	// LevelStatistics statistics/monitoring message
+	LevelStatistics Level = 10
 	// LevelJSON JSON result message
 	LevelJSON Level = 20
 )
@@ -53,28 +62,28 @@ var (
 
 // Log prints a message in the 0-Core logging format
 func Log(lvl Level, message interface{}) error {
-	// check if message is nil/empty
-	if message == nil {
-		return ErrNilMessage
-	}
-
 	var msgStr string
+	var err error
 
 	switch lvl {
 	// string messages
 	case LevelStdout, LevelStderr:
-		var err error
 		msgStr, err = msgString(message)
+		if err != nil {
+			return err
+		}
+	// stats messages
+	case LevelStatistics:
+		msgStr, err = msgStatistics(message)
 		if err != nil {
 			return err
 		}
 	// json messages
 	case LevelJSON:
-		msgBs, err := json.Marshal(message)
+		msgStr, err = msgJSON(message)
 		if err != nil {
-			return fmt.Errorf("could not marshal provided message into JSON: %s", err)
+			return err
 		}
-		msgStr = string(msgBs)
 	default:
 		return ErrLevelNotValid
 	}
@@ -85,8 +94,11 @@ func Log(lvl Level, message interface{}) error {
 	return nil
 }
 
-// checks if the interface can be turned into a string and returns it as such
+// msgString checks if the interface can be turned into a string and returns it as such
 func msgString(msg interface{}) (string, error) {
+	if msg == nil {
+		return "", ErrNilMessage
+	}
 	// check if string
 	if str, ok := msg.(string); ok {
 		if str == "" {
@@ -116,6 +128,130 @@ func msgString(msg interface{}) (string, error) {
 	}
 
 	return "", fmt.Errorf("could not turn message into string")
+}
+
+// msgStatistics validates and formats a statistics log message
+// Validates if message conforms to 0-core statistics spec:
+// https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+func msgStatistics(msg interface{}) (string, error) {
+	// check if msg is type MsgStatistics
+	statMsg, ok := msg.(MsgStatistics)
+	if !ok {
+		return "", fmt.Errorf("statistics log message was not of type MsgStatistics")
+	}
+
+	err := statMsg.Validate()
+	if err != nil {
+		return "", err
+	}
+
+	str := fmt.Sprintf("%s:%f|%s", statMsg.Key, statMsg.Value, statMsg.OP)
+
+	if len(statMsg.Tags) != 0 {
+		str = str + "|" + statMsg.Tags.String()
+	}
+
+	return str, nil
+}
+
+// msgJSON validates and formats a JSON result message
+func msgJSON(msg interface{}) (string, error) {
+	if msg == nil {
+		return "", ErrNilMessage
+	}
+	msgBs, err := json.Marshal(msg)
+	if err != nil {
+		return "", fmt.Errorf("could not marshal provided message into JSON: %s", err)
+	}
+
+	return string(msgBs), nil
+}
+
+// MsgStatistics represents the data needed for a statistics message
+type MsgStatistics struct {
+	Key   string
+	Value float64
+	OP    AggregationType
+	Tags  MetricTags
+}
+
+// Validate validates the MsgStatistics according to spec:
+// https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
+func (msg *MsgStatistics) Validate() error {
+	if msg.Key == "" {
+		return fmt.Errorf("stats message does not contain a key")
+	}
+	err := msg.OP.Validate()
+	return err
+}
+
+// AggregationType represents an statistics aggregation type
+type AggregationType string
+
+const (
+	// AggregationAverages represents an averaging aggregation type
+	AggregationAverages = AggregationType("A")
+	// AggregationDifferentiates represents a differentiating aggregation type
+	AggregationDifferentiates = AggregationType("D")
+)
+
+// Validate validates the AggregationType
+func (at AggregationType) Validate() error {
+	switch at {
+	case AggregationAverages, AggregationDifferentiates:
+		return nil
+	default:
+		return fmt.Errorf("%s is an invalid AggregationType", at)
+	}
+
+}
+
+// MetricTags represents statistics metric tags
+type MetricTags map[string]interface{}
+
+// String converts the MetricTags into a flat string for logging
+func (mt MetricTags) String() string {
+	if len(mt) < 1 {
+		return ""
+	}
+
+	var str string
+	for k, v := range mt {
+		str = str + k + "=" + tagValString(v) + ","
+	}
+
+	// return without last tag seperator
+	return str[:len(str)-1]
+}
+
+// TagValString converts a MetricTags value into a string
+func tagValString(v interface{}) string {
+	// check string
+	if str, ok := v.(string); ok {
+		return str
+	}
+
+	// check if implements fmt.Stringer interface
+	if s, ok := v.(fmt.Stringer); ok {
+		return s.String()
+	}
+
+	// check if implements encoding.TextMarshaller interface
+	if s, ok := v.(encoding.TextMarshaler); ok {
+		str, err := s.MarshalText()
+		if err == nil {
+			return string(str)
+		}
+		// if err use fmt.Sprint
+	}
+
+	// check if byte slice
+	if bs, ok := v.([]byte); ok {
+		return string(bs)
+	}
+
+	// last resort
+	return fmt.Sprint(v)
 }
 
 // printLog formats the log and writes it to the io.Writer
