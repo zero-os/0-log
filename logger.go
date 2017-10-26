@@ -14,7 +14,7 @@ String message (e.g.: LevelStdout, LevelStderr) takes strings, string aliases, t
 Statistics message (e.g: LevelStatistics) takes a MsgStatistics to have fields and validation for data required by the 0-Core statistics monitor
 https://github.com/zero-os/0-core/blob/master/docs/monitoring/stats.md
 
-The MsgStatistics Operation field takes an AggregationType which defines the data aggregation strategy for the 0-core
+The MsgStatistics Operation field takes an AggregationType which defines the data aggregation strategy for the 0-core.
 
 The MsgStatistics Tags field takes a MetricTags type which is a map with a string as key and an interface as value. When logging this map is formatted to a flat string, if the value is a string it will simply be added to the formatted string, if not it will check the value implements the fmt.Stringer or encoding.TextMarshaler interfaces, as a last resort the value will be turned into a string using fmt.Sprint.
 
