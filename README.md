@@ -1,4 +1,6 @@
-# 0-log [![Build Status](https://travis-ci.org/zero-os/0-log.svg?branch=master)](https://travis-ci.org/zero-os/0-log)
+# 0-log
+
+[![GoDoc](https://godoc.org/github.com/zero-os/0-log?status.svg)](https://godoc.org/github.com/zero-os/0-log) [![Build Status](https://travis-ci.org/zero-os/0-log.png?branch=master)](https://travis-ci.org/zero-os/0-log) [![Sourcegraph](https://sourcegraph.com/github.com/zero-os/0-log/-/badge.svg)](https://sourcegraph.com/github.com/zero-os/0-log?badge)
 
 A package that prints out log messages in a format the [0-Core][core] log monitor can read.
 
